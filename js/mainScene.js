@@ -15,12 +15,17 @@ var testObject01,
 	testObjectGeometry02, 
 	testObjectMaterial02;
 
+// materials
+var textureDiffuse, textureSpec, textureNormal, textureBump, textureEnvironment;
+
 // other
 var WIDTH = window.innerWidth;
 var HEIGHT = window.innerHeight;
+var loadingScreen;
 
 // -----------------------------------------------------------------------------------------------------
 
+addLoadingScreen();// loading screen
 init();
 animate();
 
@@ -47,51 +52,67 @@ function init() {
 	// ********************************************************
 	// camera
 	// ********************************************************
-	camera = new THREE.PerspectiveCamera(50, WIDTH/HEIGHT,  0.001, 1000);
+	camera = new THREE.PerspectiveCamera(50, WIDTH/HEIGHT,  0.001, 20000);
 	camera.position.x = 0;
 	camera.position.y = 3;
-	camera.position.z = 6;
+	camera.position.z = 2;
 	
 	// ********************************************************
 	// controls (ORBITAL)
 	// ********************************************************
 	controls = new THREE.OrbitControls(camera, renderer.domElement);
-	
-	// ********************************************************
-	// lights
-	// ********************************************************
-	
-	addLights();
-
-	// ********************************************************
-	// materials
+	//controls.enablePan = false; // dissable pan(set to true to enable)
+	controls.maxPolarAngle = Math.PI/2; // dont let camera go below horizon
 	// ********************************************************
 	
-	addMaterials();
+	addLights(); // lights
+	addMaterials(); // materials
+	addObjects(); // objects
+	//addSkybox(); // add skybox
+	addStats(); // stats meter
+	addLoaders(); // loaders
+	//addHelpers(); // helpers
 	
 	// ********************************************************
-	// objects
-	// ********************************************************
-	addObjects();
-
-	// ********************************************************
-	// STATS 
-	// ********************************************************
-    
-    stats = new Stats();
-    stats.domElement.style.position = 'absolute';
-    stats.domElement.style.bottom = '0px';
-    stats.domElement.style.zIndex = 100;
-    document.body.appendChild( stats.domElement );
-
-	// ********************************************************
-	// loaders
-	// ********************************************************
-	addLoaders();
 	
 	// render on windown resize ----------------------------------------------------------
 	window.addEventListener('resize', onWindowResize, false);
 	// -----------------------------------------------------------------------------------
+	
+	// ********************************************************
+	// LOADING SCREEN
+	// ********************************************************
+	THREE.DefaultLoadingManager.onProgress = function ( item, loaded, total ) {
+		console.log( item, loaded, total );
+		
+		if(loaded == total){
+		console.log("ALL LOADED");
+		document.getElementById("loadingScreen").style.display = 'none';
+		}
+	};
+}
+
+/* LOADING SCREEN */
+function addLoadingScreen(){
+	
+	// loadingScreen
+	loadingScreen = document.createElement( 'div' );
+	loadingScreen.id = "loadingScreen";
+	loadingScreen.style.position = 'absolute';
+	loadingScreen.style.top = '0px';
+	loadingScreen.style.bottom = '0px';
+	loadingScreen.style.width = '100%';
+	loadingScreen.style.height = '100%';
+	loadingScreen.style.textAlign = 'center';
+	loadingScreen.style.lineHeight = '100px';
+	loadingScreen.style.color = '#00ff00';
+	loadingScreen.style.fontWeight = 'bold';
+	loadingScreen.style.backgroundColor = '#000000';
+	loadingScreen.style.zIndex = '2';
+	loadingScreen.style.fontFamily = 'Monospace';
+	loadingScreen.innerHTML = 'LOADING...';
+	document.body.appendChild( loadingScreen );
+	console.log("loadingScreen");
 }
 
 /* LIGHTS */
@@ -175,8 +196,65 @@ function addLights(){
 
 /* MATERIALS */
 function addMaterials(){
+	
+	var textureName = "leather01";
+	var textureUrl = "textures/"+textureName+"/";
+	var loadedTextureName = textureUrl + textureName;
+	var textureExtention = ".png";
+	var textureWrappingAmount = 10; // texture wrapping amount (tiling)
+	
+	// texture - texture msut not be in the same folder or there is an error.
+	textureDiffuse = THREE.ImageUtils.loadTexture(loadedTextureName+textureExtention, {}, function(){ / *alert('texture loaded'); */ },	function(){ alert('error');} );
+	
+	// Specular Map 
+	textureSpec = THREE.ImageUtils.loadTexture(loadedTextureName +'_spec'+textureExtention, {}, function(){ /*alert('specular map loaded');*/ }, function(){ alert('error'); });
+	
+	// Normal Map 
+	textureNormal = THREE.ImageUtils.loadTexture(loadedTextureName +'_normal'+textureExtention, {}, function(){ /*alert('Env map loaded');*/ },	function(){ alert('error'); });
+	
+	// Bump Map 
+	textureBump = THREE.ImageUtils.loadTexture(loadedTextureName +'_displace'+textureExtention, {}, function(){ /*alert('Env map loaded');*/ },	function(){ alert('error');	});
+	
+	// Environment Map 
+	textureEnvironment = THREE.ImageUtils.loadTexture('textures/envMaps/envMap.jpg', {}, function(){ /*alert('Env map loaded');*/	},	function(){	alert('error');	});
+		
+	// Texture Wrapping
+	textureDiffuse.wrapS = THREE.RepeatWrapping;
+	textureDiffuse.wrapT = THREE.RepeatWrapping;
+	textureDiffuse.repeat.set(textureWrappingAmount,textureWrappingAmount);
+	
+	textureSpec.wrapS = THREE.RepeatWrapping;
+	textureSpec.wrapT = THREE.RepeatWrapping;
+	textureSpec.repeat.set(textureWrappingAmount,textureWrappingAmount);
+	
+    textureNormal.wrapS = THREE.RepeatWrapping;
+	textureNormal.wrapT = THREE.RepeatWrapping;
+	textureNormal.repeat.set(textureWrappingAmount,textureWrappingAmount);
+    
+	textureBump.wrapS = THREE.RepeatWrapping;
+	textureBump.wrapT = THREE.RepeatWrapping;
+	textureBump.repeat.set(textureWrappingAmount,textureWrappingAmount);
+	
+	// basic materials
 	testObjectMaterial01 = new THREE.MeshPhongMaterial({color: 0xffffff, specular: 0xffffff, shininess: 500, reflectivity: 0, side: THREE.DoubleSide});
 	testObjectMaterial02 = new THREE.MeshBasicMaterial({color: 0xffffff, side: THREE.DoubleSide});
+	
+	// textured material
+	material01 = new THREE.MeshPhongMaterial({
+		map: textureDiffuse,
+		specularMap: textureSpec,
+		envMap: textureEnvironment,
+		bumpMap: textureBump,
+        normalMap: textureNormal,
+        normalScale: new THREE.Vector2( 0.5, 0.5 ),
+		specular: 0xffffff,
+		shininess: 100,
+		reflectivity: 0,
+        side: THREE.DoubleSide
+	});
+	
+	// matCap material
+	
 }
 
 /* OBJECTS */
@@ -187,21 +265,47 @@ function addObjects(){
 	testObjectGeometry02 = new THREE.PlaneGeometry(100, 100, 1);
 	
 	// objects
-	testObject01 = new THREE.Mesh(testObjectGeometry01, testObjectMaterial01); // sphere
+	testObject01 = new THREE.Mesh(testObjectGeometry01, material01); // sphere
 	testObject01.castShadow = true;
 	testObject01.receiveShadow = true;
+	testObject01.position.y = 0;
 	
 	testObject02 = new THREE.Mesh(testObjectGeometry02, testObjectMaterial02); // ground
 	testObject02.rotation.x = Math.PI / 2;
-	testObject02.position.y = 0;
+	testObject02.position.y = -1;
 	testObject02.receiveShadow = true;
 	
-	//scene.add(testObject01);
+	scene.add(testObject01);
 	scene.add(testObject02);
-	
-	
 
+}
+
+/* SKYBOX */
+function addSkybox(){
 	
+	var imagePrefix = "textures/envMaps/studio033/";
+	var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+	var imageSuffix = ".png";
+	var skyGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );
+	
+	var materialArray = [];
+	for (var i = 0; i < 6; i++)
+		materialArray.push( new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( skyBox );
+}
+
+/* STATS */
+function addStats(){
+	stats = new Stats();
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.bottom = '0px';
+    stats.domElement.style.zIndex = 100;
+    //document.body.appendChild( stats.domElement );
 }
 
 /* LOADERS */
@@ -215,12 +319,20 @@ function addLoaders(){
 	//functions after model is loaded
 	function (geometry, materials){
 		var material = new THREE.MeshFaceMaterial(materials);
-		var object = new THREE.Mesh(geometry, material);
+		var object = new THREE.Mesh(geometry, material01);
 		object.castShadow = true;
-		object.receiveShadow = true;
-		scene.add(object);
+		//object.receiveShadow = true;
+		//scene.add(object);
 	}
 	);
+}
+
+/* HELPERS */
+function addHelpers(){
+	// axis
+	var axes = new THREE.AxisHelper(2);
+	scene.add( axes );
+	
 }
 
 /* update render on window resize */
