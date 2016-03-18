@@ -13,16 +13,23 @@ var testObject01,
 	testObjectMaterial01,
 	testObject02, 
 	testObjectGeometry02, 
-	testObjectMaterial02;
+	testObjectMaterial02,
+	testObjectModel;
 
 // materials
-var textureDiffuse, textureSpec, textureNormal, textureBump, textureEnvironment;
+var textureDiffuse, textureSpec, textureNormal, textureBump, textureEnvironment, materialMatCap;
 
 // other
 var WIDTH = window.innerWidth;
 var HEIGHT = window.innerHeight;
 var loadingScreen;
 
+// CHANGE TEXTURE ON CLICK!!
+$('#button').click(function(){
+	//testObject02.material.color.setHex( 0x00ff00 );
+	testObjectModel.material = materialMatCap; // change material to the matcap
+	materialMatCap.uniforms.tMatCap.value = THREE.ImageUtils.loadTexture( 'textures/matCap/Gold.png' ); // change the texture image to whatever
+});
 // -----------------------------------------------------------------------------------------------------
 
 addLoadingScreen();// loading screen
@@ -48,15 +55,16 @@ function init() {
 	// scene
 	// ********************************************************
 	scene = new THREE.Scene();
+	scene.name = "Test Scene";
 	
 	// ********************************************************
 	// camera
 	// ********************************************************
 	camera = new THREE.PerspectiveCamera(50, WIDTH/HEIGHT,  0.001, 20000);
 	camera.position.x = 0;
-	camera.position.y = 3;
+	camera.position.y = 0;
 	camera.position.z = 2;
-	
+		
 	// ********************************************************
 	// controls (ORBITAL)
 	// ********************************************************
@@ -105,9 +113,9 @@ function addLoadingScreen(){
 	loadingScreen.style.height = '100%';
 	loadingScreen.style.textAlign = 'center';
 	loadingScreen.style.lineHeight = '100px';
-	loadingScreen.style.color = '#00ff00';
+	loadingScreen.style.color = '#000000';
 	loadingScreen.style.fontWeight = 'bold';
-	loadingScreen.style.backgroundColor = '#000000';
+	loadingScreen.style.backgroundColor = '#FFFFFF';
 	loadingScreen.style.zIndex = '2';
 	loadingScreen.style.fontFamily = 'Monospace';
 	loadingScreen.innerHTML = 'LOADING...';
@@ -127,12 +135,13 @@ function addLights(){
 	lightKey.castShadow = true;
 	
 	lightKey.shadowDarkness = 0.25;
-	lightKey.shadowBias = 0.0001;
+	lightKey.shadow.bias = 0.0001;
 	lightKey.shadowMapWidth = 2048;
 	lightKey.shadowMapHeight = 2048;
 	lightKey.shadowCameraNear = 1;
 	lightKey.shadowCameraFar = 4000;
 	lightKey.shadowCameraFov = 30;
+	lightKey.name = "Key Light";
 	
 	scene.add(lightKey);
 	// -------------------------------------------------------
@@ -145,12 +154,13 @@ function addLights(){
 	lightRim.castShadow = false;
 	
 	lightRim.shadowDarkness = 0.2;
-	lightRim.shadowBias = 0.0001;
+	lightRim.shadow.bias = 0.0001;
 	lightRim.shadowMapWidth = 2048;
 	lightRim.shadowMapHeight = 2048;
 	lightRim.shadowCameraNear = 1;
 	lightRim.shadowCameraFar = 4000;
 	lightRim.shadowCameraFov = 30;
+	lightRim.name = "Rim Light";
 	
 	scene.add(lightRim);
 	// -------------------------------------------------------
@@ -163,12 +173,13 @@ function addLights(){
 	lightBack.castShadow = false;
 	
 	lightBack.shadowDarkness = 0.05;
-	lightBack.shadowBias = 0.0001;
+	lightBack.shadow.bias = 0.0001;
 	lightBack.shadowMapWidth = 2048;
 	lightBack.shadowMapHeight = 2048;
 	lightBack.shadowCameraNear = 1;
 	lightBack.shadowCameraFar = 4000;
 	lightBack.shadowCameraFov = 30;
+	lightBack.name = "Back Light";
 	
 	scene.add(lightBack);
 	// -------------------------------------------------------
@@ -197,11 +208,11 @@ function addLights(){
 /* MATERIALS */
 function addMaterials(){
 	
-	var textureName = "leather01";
-	var textureUrl = "textures/"+textureName+"/";
+	var textureName = "Melamine-wood-001";
+	var textureUrl = "textures/wood01/"+textureName+"/";
 	var loadedTextureName = textureUrl + textureName;
 	var textureExtention = ".png";
-	var textureWrappingAmount = 10; // texture wrapping amount (tiling)
+	var textureWrappingAmount = 5; // texture wrapping amount (tiling)
 	
 	// texture - texture msut not be in the same folder or there is an error.
 	textureDiffuse = THREE.ImageUtils.loadTexture(loadedTextureName+textureExtention, {}, function(){ / *alert('texture loaded'); */ },	function(){ alert('error');} );
@@ -246,14 +257,32 @@ function addMaterials(){
 		envMap: textureEnvironment,
 		bumpMap: textureBump,
         normalMap: textureNormal,
-        normalScale: new THREE.Vector2( 0.5, 0.5 ),
+        normalScale: new THREE.Vector2( 0.15, 0.15 ),
 		specular: 0xffffff,
-		shininess: 100,
+		shininess: 50,
 		reflectivity: 0,
         side: THREE.DoubleSide
 	});
 	
 	// matCap material
+	materialMatCap = new THREE.ShaderMaterial( {
+
+			uniforms: { 
+				tMatCap: { 
+					type: 't', 
+					value: THREE.ImageUtils.loadTexture( 'textures/matCap/ChromeB.png' ) 
+				},
+			},
+			vertexShader: document.getElementById( 'sem-vs' ).textContent,
+			fragmentShader: document.getElementById( 'sem-fs' ).textContent,
+			shading: THREE.SmoothShading,
+            side: THREE.DoubleSide
+			
+		} );
+
+		//materialMatCap.uniforms.tMatCap.value.wrapS = 200;
+		//materialMatCap.uniforms.tMatCap.value.wrapT = 200;
+		THREE.ClampToEdgeWrapping;
 	
 }
 
@@ -265,17 +294,19 @@ function addObjects(){
 	testObjectGeometry02 = new THREE.PlaneGeometry(100, 100, 1);
 	
 	// objects
-	testObject01 = new THREE.Mesh(testObjectGeometry01, material01); // sphere
+	testObject01 = new THREE.Mesh(testObjectGeometry01, materialMatCap); // sphere
 	testObject01.castShadow = true;
 	testObject01.receiveShadow = true;
 	testObject01.position.y = 0;
+	testObject01.name = "Test Sphere Mesh";
 	
 	testObject02 = new THREE.Mesh(testObjectGeometry02, testObjectMaterial02); // ground
 	testObject02.rotation.x = Math.PI / 2;
-	testObject02.position.y = -1;
+	testObject02.position.y = 0;
 	testObject02.receiveShadow = true;
+	testObject02.name = "Test Plane Mesh (ground)";
 	
-	scene.add(testObject01);
+	//scene.add(testObject01);
 	scene.add(testObject02);
 
 }
@@ -310,21 +341,82 @@ function addStats(){
 
 /* LOADERS */
 function addLoaders(){
-	var loader = new THREE.JSONLoader();
+	/*
+	var loader = new THREE.OBJLoader();
 	
 	//load resources
 	loader.load(
 	// resource url
-	'models/monkey.json',
+	'models/st61.obj',
 	//functions after model is loaded
+		
 	function (geometry, materials){
+		
 		var material = new THREE.MeshFaceMaterial(materials);
-		var object = new THREE.Mesh(geometry, material01);
-		object.castShadow = true;
-		//object.receiveShadow = true;
-		//scene.add(object);
+		testObjectModel = new THREE.Mesh(geometry, materialMatCap);
+		testObjectModel.position.y = 0;
+		testObjectModel.castShadow = true;
+		testObjectModel.receiveShadow = true;
+		testObjectModel.scale.set(0.5,0.5,0.5);
+		testObjectModel.name = "Main Mesh";
+		scene.add(testObjectModel);
+		
 	}
 	);
+	*/
+var material;
+var modelPath = "models/st61.obj";
+var loader = new THREE.OBJLoader();
+    loader.load(modelPath, function (object) {
+
+        //if you want to add your custom material
+        var materialObj = new THREE.MeshPhongMaterial({color: 0xffffff, specular: 0xffffff, shininess: 0.1, reflectivity: 0.1, side: THREE.DoubleSide});
+        object.traverse(function (child) {
+            if (child instanceof THREE.Mesh) {
+				
+				
+				/*TESTING*/
+				/*
+				var geometry = new THREE.Geometry().fromBufferGeometry( child.geometry );
+				geometry.mergeVertices();
+				geometry.computeFaceNormals();
+				geometry.computeVertexNormals();
+				child.geometry = new THREE.BufferGeometry().fromGeometry( geometry );
+				*/
+				/*TESTING*/
+				
+				child.material = materialObj;
+            }
+        });
+
+        //then directly add the object
+		
+		
+        scene.add(object);
+		// group name
+		object.name="myGroup";
+		
+		// seat
+		object.children[0].material = new THREE.MeshPhongMaterial({color: 0x7fa22b, specular: 0xcccccc, shininess: 10, reflectivity: 10, side: THREE.DoubleSide});
+		
+		// bolts
+		object.children[1].material = new THREE.MeshPhongMaterial({color: 0xffffff, reflectivity: 10, side: THREE.DoubleSide});
+		
+		// backrest
+		object.children[2].material = new THREE.MeshPhongMaterial({color: 0x7fa22b, specular: 0xcccccc, shininess: 10, reflectivity: 10, side: THREE.DoubleSide});
+		//object.children[2].material = material01;
+		
+		// frameRim
+		object.children[3].material = material01;
+		
+		// frameLegs
+		object.children[4].material = material01;
+		
+		// footPads
+		object.children[5].material = new THREE.MeshPhongMaterial({color: 0xffffff, specular: 0xcccccc, shininess: 0.1, reflectivity: 0.1, side: THREE.DoubleSide});
+		
+    });
+
 }
 
 /* HELPERS */
@@ -349,7 +441,11 @@ function onWindowResize() {
 /* animate */
 // ---------------
 function animate() {
+	
 	requestAnimationFrame(animate); //60fps
+	//testObject01.rotation.y += 0.001;// test animation
+	
+	
 	update();
 	render();
 }
