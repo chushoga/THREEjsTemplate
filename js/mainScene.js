@@ -11,9 +11,9 @@ var  controls, stats, keyboard;
 var testObject01, 
 	testObjectGeometry01, 
 	testObjectMaterial01,
-	testObject02, 
-	testObjectGeometry02, 
-	testObjectMaterial02,
+	floorObject, 
+	floorGeometry, 
+	floorMaterial,
 	testObjectModel;
 
 // materials
@@ -24,11 +24,53 @@ var WIDTH = window.innerWidth;
 var HEIGHT = window.innerHeight;
 var loadingScreen;
 
+/* LIGHTS */
+var bulbLight, bulbMat, stats, hemiLight;
+
+// ref for lumens: http://www.power-sure.com/lumens.htm
+var bulbLuminousPowers = {
+	"110000 lm (1000W)": 110000,
+	"3500 lm (300W)": 3500,
+	"1700 lm (100W)": 1700,
+	"800 lm (60W)": 800,
+	"400 lm (40W)": 400,
+	"180 lm (25W)": 180,
+	"20 lm (4W)": 20,
+	"Off": 0,
+};
+
+// ref for solar irradiances: https://en.wikipedia.org/wiki/Lux
+var hemiLuminousIrradiances = {
+	"0.0001 lx (Moonless Night)": 0.0001,
+	"0.002 lx (Night Airglow)": 0.002,
+	"0.5 lx (Full Moon)": 0.5,
+	"3.4 lx (City Twilight)": 3.4,
+	"50 lx (Living Room)": 50,
+	"100 lx (Very Overcast)": 100,
+	"350 lx (Office Room)": 350,
+	"400 lx (Sunrise/Sunset)": 400,
+	"1000 lx (Overcast)": 1000,
+	"18000 lx (Daylight)": 18000,
+	"50000 lx (Direct Sun)": 50000,
+};
+
+var params = {
+	shadows: true,
+	exposure: 0.68,
+	bulbPower: Object.keys( bulbLuminousPowers )[2],
+	hemiIrradiance: Object.keys( hemiLuminousIrradiances )[0]
+};
+
+// ---------------------------------------------------------
+
+var clock = new THREE.Clock();
+var previousShadowMap = false;
+
 // CHANGE TEXTURE ON CLICK!!
 $('#button').click(function(){
-	//testObject02.material.color.setHex( 0x00ff00 );
-	testObjectModel.material = materialMatCap; // change material to the matcap
-	materialMatCap.uniforms.tMatCap.value = THREE.ImageUtils.loadTexture( 'textures/matCap/Gold.png' ); // change the texture image to whatever
+	//floorObject.material.color.setHex( 0x00ff00 );
+	floorObject.material = materialMatCap; // change material to the matcap
+	materialMatCap.uniforms.tMatCap.value = THREE.TextureLoader().load( 'textures/matCap/Gold.png' ); // change the texture image to whatever
 });
 // -----------------------------------------------------------------------------------------------------
 
@@ -42,13 +84,25 @@ animate();
 // ---------------
 function init() {
 
-	// ********************************************************
-	// renderer
-	// ********************************************************
-	renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
-	renderer.setSize(WIDTH, HEIGHT);
+	//test if webgl is supported and if so use WebGL if not use canvas renderer
+	if(Detector.webgl){ 
+		// ********************************************************
+		// renderer
+		// ********************************************************
+		renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
+	} else {
+		renderer = new THREE.CanvasRenderer();
+	}
+	
+	renderer.physicallyCorrectLights = true;
+	renderer.gammaInput = true;
+	renderer.gammaOutput = true;
 	renderer.shadowMap.enabled = true;
+	renderer.toneMapping = THREE.ReinhardToneMapping;
+	renderer.setPixelRatio( window.devicePixelRatio );
 	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	renderer.setSize(WIDTH, HEIGHT);
+	renderer.setClearColor(0x000000, 1);
 	document.body.appendChild(renderer.domElement);
 	
 	// ********************************************************
@@ -61,9 +115,9 @@ function init() {
 	// camera
 	// ********************************************************
 	camera = new THREE.PerspectiveCamera(50, WIDTH/HEIGHT,  0.001, 20000);
-	camera.position.x = 0;
-	camera.position.y = 0;
-	camera.position.z = 2;
+	camera.position.x = 1;
+	camera.position.y = 1.25;
+	camera.position.z = 1;
 		
 	// ********************************************************
 	// controls (ORBITAL)
@@ -98,6 +152,42 @@ function init() {
 		document.getElementById("loadingScreen").style.display = 'none';
 		}
 	};
+	
+	// ********************************************************
+	// GUI
+	// ********************************************************
+	var gui = new dat.GUI();
+
+				gui.add( params, 'hemiIrradiance', Object.keys( hemiLuminousIrradiances ) );
+				gui.add( params, 'bulbPower', Object.keys( bulbLuminousPowers ) );
+				gui.add( params, 'exposure', 0, 1 );
+				gui.add( params, 'shadows' );
+				gui.open();
+	// ********************************************************
+}
+
+/* PHYSICAL LIGHTING SETUP TO RUN WITHIN THE RENDER FUNCTION */
+function addPhysicalLighting(){
+	renderer.toneMappingExposure = Math.pow( params.exposure, 5.0 ); // to allow for very bright scenes.
+	renderer.shadowMap.enabled = params.shadows;
+	bulbLight.castShadow = params.shadows;
+	if( params.shadows !== previousShadowMap ) {
+		//ballMat.needsUpdate = true;
+		//cubeMat.needsUpdate = true;
+		//floorMat.needsUpdate = true;
+		floorMaterial.needsUpdate = true;
+		previousShadowMap = params.shadows;
+	}
+	bulbLight.power = bulbLuminousPowers[ params.bulbPower ];
+	bulbMat.emissiveIntensity = bulbLight.intensity / Math.pow( 0.02, 2.0 ); // convert from intensity to irradiance at bulb surface
+
+	hemiLight.intensity = hemiLuminousIrradiances[ params.hemiIrradiance ];
+	var time = Date.now() * 0.0005;
+	var delta = clock.getDelta();
+
+	bulbLight.position.y = Math.cos( time ) * 0.75 + 1.25;
+	//testObject01.position.x = Math.cos ( time ) * 0.25 + 0.5;
+	
 }
 
 /* LOADING SCREEN */
@@ -124,7 +214,7 @@ function addLoadingScreen(){
 }
 
 /* LIGHTS */
-function addLights(){
+function addLights() {
 	// -------------------------------------------------------
 	/* KEY LIGHT */
 	// -------------------------------------------------------
@@ -134,16 +224,16 @@ function addLights(){
 	// shadowMaps
 	lightKey.castShadow = true;
 	
-	lightKey.shadowDarkness = 0.25;
-	lightKey.shadow.bias = 0.0001;
-	lightKey.shadowMapWidth = 2048;
-	lightKey.shadowMapHeight = 2048;
-	lightKey.shadowCameraNear = 1;
-	lightKey.shadowCameraFar = 4000;
-	lightKey.shadowCameraFov = 30;
+	// lightKey.shadowDarkness = 0.25; //removed from r74
+	lightKey.shadow.bias = -0.0001;
+	lightKey.shadow.mapSize.width = 2048;
+	lightKey.shadow.mapSize.height = 2048;
+	lightKey.shadow.camera.near = 1;
+	lightKey.shadow.camera.far = 4000;
+	lightKey.shadow.camera.fov = 30;
 	lightKey.name = "Key Light";
 	
-	scene.add(lightKey);
+	//scene.add(lightKey);
 	// -------------------------------------------------------
 	/* RIM LIGHT */
 	// -------------------------------------------------------
@@ -153,16 +243,16 @@ function addLights(){
 	// shadowMaps
 	lightRim.castShadow = false;
 	
-	lightRim.shadowDarkness = 0.2;
-	lightRim.shadow.bias = 0.0001;
-	lightRim.shadowMapWidth = 2048;
-	lightRim.shadowMapHeight = 2048;
-	lightRim.shadowCameraNear = 1;
-	lightRim.shadowCameraFar = 4000;
-	lightRim.shadowCameraFov = 30;
+	// lightRim.shadowDarkness = 0.2; //removed from r74
+	lightRim.shadow.bias = -0.0001;
+	lightRim.shadow.mapSize.width = 2048;
+	lightRim.shadow.mapSize.height = 2048;
+	lightRim.shadow.camera.near = 1;
+	lightRim.shadow.camera.far = 4000;
+	lightRim.shadow.camera.fov = 30;
 	lightRim.name = "Rim Light";
 	
-	scene.add(lightRim);
+	//scene.add(lightRim);
 	// -------------------------------------------------------
 	/* BACK LIGHT */
 	// -------------------------------------------------------
@@ -172,17 +262,18 @@ function addLights(){
 	// shadowMaps
 	lightBack.castShadow = false;
 	
-	lightBack.shadowDarkness = 0.05;
-	lightBack.shadow.bias = 0.0001;
-	lightBack.shadowMapWidth = 2048;
-	lightBack.shadowMapHeight = 2048;
-	lightBack.shadowCameraNear = 1;
-	lightBack.shadowCameraFar = 4000;
-	lightBack.shadowCameraFov = 30;
+	// lightBack.shadowDarkness = 0.05; //removed from r74
+	lightBack.shadow.bias = -0.0001;
+	lightBack.shadow.mapSize.width = 2048;
+	lightBack.shadow.mapSize.height = 2048;
+	lightBack.shadow.camera.near = 1;
+	lightBack.shadow.camera.far = 4000;
+	lightBack.shadow.camera.fov = 30;
 	lightBack.name = "Back Light";
 	
-	scene.add(lightBack);
+	//scene.add(lightBack);
 	// -------------------------------------------------------
+	
 	// spotlight target
 	var spotTarget = new THREE.Object3D();
 	spotTarget.position.set(0, 0, 0);
@@ -191,7 +282,7 @@ function addLights(){
 	lightRim.target = spotTarget;
 	lightBack.target = spotTarget;
 	
-	//lightAmbient = new THREE.AmbientLight(0x404040);
+	lightAmbient = new THREE.AmbientLight(0x404040, 0.6);
 	//scene.add(lightAmbient);
 	
 	//light helpers
@@ -203,11 +294,38 @@ function addLights(){
 	//scene.add(poinLightHelperKey);
 	//scene.add(poinLightHelperRim);
 	//scene.add(poinLightHelperBack);
+	
+	
+	// -------------------------------------------------------
+	/* TEST LIGHT */
+	// -------------------------------------------------------
+	var bulbGeometry = new THREE.SphereGeometry( 0.02, 16, 8 );
+	bulbLight = new THREE.PointLight( 0xffee88, 1, 100, 2 );
+
+	bulbMat = new THREE.MeshStandardMaterial( {
+		emissive: 0xffffee,
+		emissiveIntensity: 1,
+		color: 0x000000
+	});
+	
+	bulbLight.add( new THREE.Mesh( bulbGeometry, bulbMat ) );
+	bulbLight.position.set( 1, 2, 0 );
+	bulbLight.castShadow = true;
+	bulbLight.shadow.bias = -0.0001;
+	bulbLight.shadow.mapSize.width = 1024;
+	bulbLight.shadow.mapSize.height = 1024;
+	scene.add( bulbLight );
+	
+	hemiLight = new THREE.HemisphereLight( 0xddeeff, 0x0f0e0d, 0.02 );
+	scene.add( hemiLight );
+	
+	// -------------------------------------------------------
 }
 
 /* MATERIALS */
 function addMaterials(){
 	
+	var textureLoader = new THREE.TextureLoader();
 	var textureName = "Melamine-wood-001";
 	var textureUrl = "textures/wood01/"+textureName+"/";
 	var loadedTextureName = textureUrl + textureName;
@@ -215,19 +333,19 @@ function addMaterials(){
 	var textureWrappingAmount = 5; // texture wrapping amount (tiling)
 	
 	// texture - texture msut not be in the same folder or there is an error.
-	textureDiffuse = THREE.ImageUtils.loadTexture(loadedTextureName+textureExtention, {}, function(){ / *alert('texture loaded'); */ },	function(){ alert('error');} );
+	textureDiffuse = textureLoader.load(loadedTextureName+textureExtention);
 	
 	// Specular Map 
-	textureSpec = THREE.ImageUtils.loadTexture(loadedTextureName +'_spec'+textureExtention, {}, function(){ /*alert('specular map loaded');*/ }, function(){ alert('error'); });
+	textureSpec = textureLoader.load(loadedTextureName +'_spec'+textureExtention, function(){ /*alert('specular map loaded');*/ }, function(){ alert('error'); });
 	
 	// Normal Map 
-	textureNormal = THREE.ImageUtils.loadTexture(loadedTextureName +'_normal'+textureExtention, {}, function(){ /*alert('Env map loaded');*/ },	function(){ alert('error'); });
+	textureNormal = textureLoader.load(loadedTextureName +'_normal'+textureExtention, function(){ /*alert('Env map loaded');*/ },	function(){ alert('error'); });
 	
 	// Bump Map 
-	textureBump = THREE.ImageUtils.loadTexture(loadedTextureName +'_displace'+textureExtention, {}, function(){ /*alert('Env map loaded');*/ },	function(){ alert('error');	});
+	textureBump = textureLoader.load(loadedTextureName +'_displace'+textureExtention, function(){ /*alert('Env map loaded');*/ },	function(){ alert('error');	});
 	
 	// Environment Map 
-	textureEnvironment = THREE.ImageUtils.loadTexture('textures/envMaps/envMap.jpg', {}, function(){ /*alert('Env map loaded');*/	},	function(){	alert('error');	});
+	textureEnvironment = textureLoader.load('textures/envMaps/envMap.jpg', function(){ /*alert('Env map loaded');*/	},	function(){	alert('error');	});
 		
 	// Texture Wrapping
 	textureDiffuse.wrapS = THREE.RepeatWrapping;
@@ -248,7 +366,42 @@ function addMaterials(){
 	
 	// basic materials
 	testObjectMaterial01 = new THREE.MeshPhongMaterial({color: 0xffffff, specular: 0xffffff, shininess: 500, reflectivity: 0, side: THREE.DoubleSide});
-	testObjectMaterial02 = new THREE.MeshBasicMaterial({color: 0xffffff, side: THREE.DoubleSide});
+	
+	
+	floorMaterial = new THREE.MeshStandardMaterial({
+		roughness: 0.8,
+		color: 0xffffff,
+		metalness: 0.2,
+		bumpScale: 0.0005,
+		side: THREE.DoubleSide
+	});
+	
+	//FloorTexture HERE
+				textureLoader.load( "textures/floor/hardwood.jpg", function( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 4;
+					map.repeat.set( 96, 96 );
+					floorMaterial.map = map;
+					floorMaterial.needsUpdate = true;
+				}, function(){alert("errorLoading");} );
+				textureLoader.load( "textures/floor/hardwood_displace.jpg", function( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 4;
+					map.repeat.set( 96, 96 );
+					floorMaterial.bumpMap = map;
+					floorMaterial.needsUpdate = true;
+				} );
+				textureLoader.load( "textures/floor/hardwood_spec.jpg", function( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 4;
+					map.repeat.set( 96, 96 );
+					floorMaterial.roughnessMap = map;
+					floorMaterial.needsUpdate = true;
+				} );
+	
 	
 	// textured material
 	material01 = new THREE.MeshPhongMaterial({
@@ -259,8 +412,8 @@ function addMaterials(){
         normalMap: textureNormal,
         normalScale: new THREE.Vector2( 0.15, 0.15 ),
 		specular: 0xffffff,
-		shininess: 50,
-		reflectivity: 0,
+		shininess: 30,
+		reflectivity: 0.5,
         side: THREE.DoubleSide
 	});
 	
@@ -270,7 +423,7 @@ function addMaterials(){
 			uniforms: { 
 				tMatCap: { 
 					type: 't', 
-					value: THREE.ImageUtils.loadTexture( 'textures/matCap/ChromeB.png' ) 
+					value: new THREE.TextureLoader().load( 'textures/matCap/ChromeB.png' ) 
 				},
 			},
 			vertexShader: document.getElementById( 'sem-vs' ).textContent,
@@ -290,24 +443,24 @@ function addMaterials(){
 function addObjects(){
 	
 	// geometry
-	testObjectGeometry01 = new THREE.SphereGeometry(1, 64, 64);
-	testObjectGeometry02 = new THREE.PlaneGeometry(100, 100, 1);
+	testObjectGeometry01 = new THREE.SphereGeometry(0.1, 64, 64);
+	floorGeometry = new THREE.PlaneGeometry(100, 100, 1);
 	
 	// objects
 	testObject01 = new THREE.Mesh(testObjectGeometry01, materialMatCap); // sphere
 	testObject01.castShadow = true;
 	testObject01.receiveShadow = true;
-	testObject01.position.y = 0;
+	testObject01.position.y = 0.1;
 	testObject01.name = "Test Sphere Mesh";
 	
-	testObject02 = new THREE.Mesh(testObjectGeometry02, testObjectMaterial02); // ground
-	testObject02.rotation.x = Math.PI / 2;
-	testObject02.position.y = 0;
-	testObject02.receiveShadow = true;
-	testObject02.name = "Test Plane Mesh (ground)";
+	floorObject = new THREE.Mesh(floorGeometry, floorMaterial); // ground
+	floorObject.receiveShadow = true;
+	floorObject.rotation.x = -Math.PI / 2.0;
+	floorObject.position.y = 0;
+	floorObject.name = "Test Plane Mesh (ground)";
 	
 	//scene.add(testObject01);
-	scene.add(testObject02);
+	scene.add(floorObject);
 
 }
 
@@ -336,7 +489,7 @@ function addStats(){
     stats.domElement.style.position = 'absolute';
     stats.domElement.style.bottom = '0px';
     stats.domElement.style.zIndex = 100;
-    //document.body.appendChild( stats.domElement );
+    document.body.appendChild( stats.domElement );
 }
 
 /* LOADERS */
@@ -376,23 +529,29 @@ var loader = new THREE.OBJLoader();
 				
 				
 				/*TESTING*/
-				/*
+				
 				var geometry = new THREE.Geometry().fromBufferGeometry( child.geometry );
 				geometry.mergeVertices();
 				geometry.computeFaceNormals();
 				geometry.computeVertexNormals();
 				child.geometry = new THREE.BufferGeometry().fromGeometry( geometry );
-				*/
+				
 				/*TESTING*/
 				
 				child.material = materialObj;
+				child.castShadow = true;
+				child.receiveShadow = true;
             }
         });
 
         //then directly add the object
-		
-		
         scene.add(object);
+		var hex  = 0xff0000;
+		var bbox = new THREE.BoundingBoxHelper( object, hex );
+		bbox.update();
+		scene.add( bbox );
+		
+		
 		// group name
 		object.name="myGroup";
 		
@@ -400,7 +559,7 @@ var loader = new THREE.OBJLoader();
 		object.children[0].material = new THREE.MeshPhongMaterial({color: 0x7fa22b, specular: 0xcccccc, shininess: 10, reflectivity: 10, side: THREE.DoubleSide});
 		
 		// bolts
-		object.children[1].material = new THREE.MeshPhongMaterial({color: 0xffffff, reflectivity: 10, side: THREE.DoubleSide});
+		object.children[1].material = new THREE.MeshPhongMaterial({color: 0xffffff, reflectivity: 1, side: THREE.DoubleSide});
 		
 		// backrest
 		object.children[2].material = new THREE.MeshPhongMaterial({color: 0x7fa22b, specular: 0xcccccc, shininess: 10, reflectivity: 10, side: THREE.DoubleSide});
@@ -416,7 +575,6 @@ var loader = new THREE.OBJLoader();
 		object.children[5].material = new THREE.MeshPhongMaterial({color: 0xffffff, specular: 0xcccccc, shininess: 0.1, reflectivity: 0.1, side: THREE.DoubleSide});
 		
     });
-
 }
 
 /* HELPERS */
@@ -444,6 +602,9 @@ function animate() {
 	
 	requestAnimationFrame(animate); //60fps
 	//testObject01.rotation.y += 0.001;// test animation
+	var test123 = scene.getObjectByName('myGroup');
+	
+	//test123.rotation.y += 0.001;
 	
 	
 	update();
@@ -454,13 +615,18 @@ function animate() {
 /* update */
 // ---------------
 function update() {
-	stats.update();
+	
 	controls.update(); // updates orbit controls (mouse)
 }
+
 
 // ---------------
 /* render */
 // ---------------
 function render() {
+	//add physical lighting
+	addPhysicalLighting();
+	
 	renderer.render(scene, camera);
+	stats.update();
 }

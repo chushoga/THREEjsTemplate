@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-
+	<link rel="shortcut icon" href="favicon.ico">
 	<title>THREEjs TEMPLATE</title>
 	<meta name="description" content="THREEjs TEMPLATE">
 	<meta name="author" content="SitePoint">
@@ -43,18 +43,20 @@
 	<link rel=stylesheet href="css/info.css"/>
 	<script src="js/info.js"></script>
 	<script src="js/ShaderMaterial.js"></script><!-- shaders here -->
-	
+	<script src="js/dat.gui.min.js"></script><!-- GUI -->
+	<script src="js/Detector.js"></script><!-- Detects if if browswer is using WebGL -->
+
 
 </head>
 
 
 <body>
 
-	<!-- shader includes here  -->
-	<?php 
+<!-- shader includes here  -->
+	<?php
 		include_once("shaders/shader01.php");
 	?>
-	
+
 	<div id="infoButton"></div>
 	<div id="infoBox" title="Demo Information">
 	This three.js demo is part of a collection at
